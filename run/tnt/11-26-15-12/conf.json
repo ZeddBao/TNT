@@ -1,0 +1,23 @@
+{
+    "data_root": "dataset/interm_data", 
+    "output_dir": "run/tnt/", 
+    "num_glayer": 1, 
+    "aux_loss": true, 
+    "batch_size": 256, 
+    "n_epoch": 50, 
+    "num_workers": 16, 
+    "with_cuda": true, 
+    "multi_gpu": true, 
+    "local_rank": 0, 
+    "log_freq": 2, 
+    "on_memory": true, 
+    "lr": 0.001, 
+    "warmup_epoch": 20, 
+    "lr_update_freq": 10, 
+    "lr_decay_rate": 0.5, 
+    "adam_weight_decay": 0.01, 
+    "adam_beta1": 0.9, 
+    "adam_beta2": 0.999, 
+    "resume_checkpoint": null, 
+    "resume_model": null
+}

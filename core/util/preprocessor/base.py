@@ -144,6 +144,7 @@ class Preprocessor(Dataset):
     def get_candidate_gt(target_candidate, gt_target):
         """
         find the target candidate closest to the gt and output the one-hot ground truth
+        静态方法 get_candidate_gt 找到与给定目标位置（ground truth）最近的候选位置，并输出一个 one-hot 编码的 ground truth，以及与选定候选位置的偏移量
         :param target_candidate, (N, 2) candidates
         :param gt_target, (1, 2) the coordinate of final target
         """

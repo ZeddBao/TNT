@@ -44,7 +44,7 @@ class GraphData(Data):
     override key `cluster` indicating which polyline_id is for the vector
     """
 
-    def __inc__(self, key, value):
+    def __inc__(self, key, value, store):
         if key == 'edge_index':
             return self.x.size(0)
         elif key == 'cluster':
@@ -59,7 +59,7 @@ class GraphData(Data):
 class ArgoverseInMem(InMemoryDataset):
     def __init__(self, root, transform=None, pre_transform=None):
         super(ArgoverseInMem, self).__init__(root, transform, pre_transform)
-        self.data, self.slices = torch.load(self.processed_paths[0])
+        # self.data, self.slices = torch.load(self.processed_paths[0])
         gc.collect()
 
     @property
@@ -124,12 +124,15 @@ class ArgoverseInMem(InMemoryDataset):
 
                 orig=torch.from_numpy(raw_data['orig'].values[0]).float().unsqueeze(0),
                 rot=torch.from_numpy(raw_data['rot'].values[0]).float().unsqueeze(0),
-                seq_id=torch.tensor([int(raw_data['seq_id'])]).int()
+                seq_id=torch.tensor([int(raw_data['seq_id'].iloc[0])]).int()
             )
             data_list.append(graph_input)
 
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
+        # del raw_data, cluster, y, edge_index, x, graph_input
+        # gc.collect()
+
 
     def get(self, idx):
         data = super(ArgoverseInMem, self).get(idx).clone()
@@ -222,15 +225,19 @@ class ArgoverseInMem(InMemoryDataset):
 class ArgoverseInDisk(Dataset):
     def __init__(self, root, transform=None, pre_transform=None):
         super(ArgoverseInDisk, self).__init__(root, transform, pre_transform)
-        self.data, self.slices = torch.load(self.processed_paths[0])
+        # self.data, self.slices = torch.load(self.processed_paths[0])    # 返回 root/processed/中第一个名字含有 'data' 的 pt 文件
         gc.collect()
 
     @property
-    def raw_file_names(self):
+    def raw_file_names(self):   # 重构 torch_geometric.data.Dataset 中的属性
         return [file for file in os.listdir(self.raw_dir) if "features" in file and file.endswith(".pkl")]
 
     @property
     def processed_file_names(self):
+        '''
+        :desc: 重构 torch_geometric.data.Dataset 中的属性
+        :return: 返回所有 processed_dir 中名字含有 'data' 的 pt 文件 processed_dir  = root/processed
+        '''
         return [file for file in os.listdir(self.processed_dir) if "data" in file and file.endswith(".pt")]
 
     def download(self):
@@ -249,13 +256,13 @@ class ArgoverseInDisk(Dataset):
             raw_data = pd.read_pickle(raw_path)
 
             # statistics
-            traj_num = raw_data['feats'].values[0].shape[0]
+            traj_num = raw_data['feats'].values[0].shape[0] # displacement vectors
             traj_lens.append(traj_num)
 
-            lane_num = raw_data['graph'].values[0]['lane_idcs'].max() + 1
+            lane_num = raw_data['graph'].values[0]['lane_idcs'].max() + 1   # 车道图
             valid_lens.append(traj_num + lane_num)
 
-            candidate_num = raw_data['tar_candts'].values[0].shape[0]
+            candidate_num = raw_data['tar_candts'].values[0].shape[0]   # the target candidate centerlines
             candidate_lens.append(candidate_num)
         num_valid_len_max = np.max(valid_lens)
         num_candidate_max = np.max(candidate_lens)
@@ -284,32 +291,35 @@ class ArgoverseInDisk(Dataset):
 
                 candidate_len_max=torch.tensor([num_candidate_max]).int(),
                 candidate_mask=[],
-                candidate=torch.from_numpy(raw_data['tar_candts'].values[0]).float(),
-                candidate_gt=torch.from_numpy(raw_data['gt_candts'].values[0]).bool(),
-                offset_gt=torch.from_numpy(raw_data['gt_tar_offset'].values[0]).float(),
-                target_gt=torch.from_numpy(raw_data['gt_preds'].values[0][0][-1, :]).float(),
+                candidate=torch.from_numpy(raw_data['tar_candts'].values[0]).float(),   # the target candidate centerlines
+                candidate_gt=torch.from_numpy(raw_data['gt_candts'].values[0]).bool(),  # the ground truth of future prediction
+                offset_gt=torch.from_numpy(raw_data['gt_tar_offset'].values[0]).float(),    # the ground truth of target offset
+                target_gt=torch.from_numpy(raw_data['gt_preds'].values[0][0][-1, :]).float(),   # 轨迹标签
 
-                orig=torch.from_numpy(raw_data['orig'].values[0]).float().unsqueeze(0),
-                rot=torch.from_numpy(raw_data['rot'].values[0]).float().unsqueeze(0),
-                seq_id=torch.tensor([int(raw_data['seq_id'])]).int()
+                orig=torch.from_numpy(raw_data['orig'].values[0]).float().unsqueeze(0),  # 中心点
+                rot=torch.from_numpy(raw_data['rot'].values[0]).float().unsqueeze(0),   # 旋转矩阵
+                seq_id=torch.tensor([int(raw_data['seq_id'].iloc[0])]).int()    # 轨迹序列号（csv文件名）
             )
 
             # save the data into a single file
             torch.save(graph_input, osp.join(self.processed_dir, 'data_{}.pt'.format(file_id)))
 
-    def get(self, idx: int):
+            # del raw_data, cluster, y, edge_index, x, graph_input
+            # gc.collect()
+
+    def get(self, idx: int):    # 重构 torch_geometric.data.Dataset 中的方法，返回一个 GraphData 对象，相当于__getitem__
         data = torch.load(osp.join(self.processed_dir, self.processed_file_names[idx]))
 
         feature_len = data.x.shape[1]
         index_to_pad = data.time_step_len[0].item()
         valid_len = data.valid_len[0].item()
 
-        # pad feature with zero nodes
+        # pad feature with zero nodes   # 补零 节点
         data.x = torch.cat([data.x, torch.zeros((index_to_pad - valid_len, feature_len), dtype=data.x.dtype)])
         data.cluster = torch.cat([data.cluster, torch.arange(valid_len, index_to_pad)]).long()
         data.identifier = torch.cat([data.identifier, torch.zeros((index_to_pad - valid_len, 2), dtype=data.x.dtype)])
 
-        # pad candidate and candidate_gt
+        # pad candidate and candidate_gt    # 补零 候选中心线
         num_cand_max = data.candidate_len_max[0].item()
         data.candidate_mask = torch.cat([torch.ones((len(data.candidate), 1)),
                                          torch.zeros((num_cand_max - len(data.candidate), 1))])

@@ -10,7 +10,7 @@ from torch_geometric.data import DataLoader
 
 # from core.dataloader.dataset import GraphDataset
 # from core.dataloader.argoverse_loader import Argoverse, GraphData
-from core.dataloader.argoverse_loader_v2 import ArgoverseInMem as ArgoverseInMemv2, GraphData
+from core.dataloader.argoverse_loader_v2 import ArgoverseInMem as ArgoverseInMemv2, ArgoverseInDisk as ArgoverseInDiskv2, GraphData
 from core.trainer.vectornet_trainer import VectorNetTrainer
 
 TEST = False
@@ -25,8 +25,8 @@ def train(n_gpu, args):
     :return:
     """
     # data loading
-    train_set = ArgoverseInMemv2(pjoin(args.data_root, "train_intermediate")).shuffle()
-    eval_set = ArgoverseInMemv2(pjoin(args.data_root, "val_intermediate"))
+    train_set = ArgoverseInDiskv2(pjoin(args.data_root, "train_intermediate")).shuffle()
+    eval_set = ArgoverseInDiskv2(pjoin(args.data_root, "val_intermediate"))
 
     # init output dir
     time_stamp = datetime.now().strftime("%m-%d-%H-%M")

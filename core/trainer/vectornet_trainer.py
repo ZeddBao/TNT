@@ -10,8 +10,8 @@ from argoverse.evaluation.eval_forecasting import get_displacement_errors_and_mi
 from argoverse.evaluation.competition_util import generate_forecasting_h5
 
 try:
-    from apex import amp
-    from apex.parallel import DistributedDataParallel
+    from torch.cuda.amp import autocast, GradScaler
+    from torch.nn.parallel import DistributedDataParallel
 except:
     pass
 
@@ -119,7 +119,9 @@ class VectorNetTrainer(Trainer):
         self.model = self.model.to(self.device)
         if self.multi_gpu:
             self.model = DistributedDataParallel(self.model)
-            self.model, self.optimizer = amp.initialize(self.model, self.optim, opt_level="O0")
+            # self.model, self.optimizer = amp.initialize(self.model, self.optim, opt_level="O0")
+            self.scaler = GradScaler()
+            self.use_amp = True
             if self.verbose:
                 print("[TNTTrainer]: Train the mode with multiple GPUs: {}.".format(self.cuda_id))
         else:
@@ -151,15 +153,34 @@ class VectorNetTrainer(Trainer):
 
             if training:
                 self.optm_schedule.zero_grad()
-                loss = self.compute_loss(data)
+                # loss = self.compute_loss(data)
 
-                if self.multi_gpu:
-                    with amp.scale_loss(loss, self.optim) as scaled_loss:
-                        scaled_loss.backward()
+                # With autocast, the forward pass will run in mixed precision.
+                with torch.cuda.amp.autocast(enabled=self.use_amp):
+                    loss = self.compute_loss(data)
+
+                # if self.multi_gpu:
+                #     with amp.scale_loss(loss, self.optim) as scaled_loss:
+                #         scaled_loss.backward()
+                # else:
+                #     loss.backward()
+
+                # self.optim.step()
+
+                # Use GradScaler to scale the loss and call backward.
+                if self.use_amp:
+                    self.scaler.scale(loss).backward()
                 else:
                     loss.backward()
 
-                self.optim.step()
+                # Use GradScaler to unscale gradients and update parameters.
+                if self.use_amp:
+                    self.scaler.step(self.optim)
+                    self.scaler.update()
+                else:
+                    self.optim.step()
+
+
                 if not self.multi_gpu or (self.multi_gpu and self.cuda_id == 1):
                     self.write_log("Train Loss", loss.detach().item() / n_graph, i + epoch * len(dataloader))
 

@@ -87,7 +87,7 @@ class SelfAttentionFCLayer(nn.Module):
                 cnt = int(cnt.detach().cpu().numpy())
                 mask[batch_id, :, cnt:] = True
                 mask[batch_id, cnt:] = True
-            X_masked = X.masked_fill(mask, -1e12)
+            X_masked = X.masked_fill(mask, -65504)
             return nn.functional.softmax(X_masked, dim=-1) * (1 - mask.float())
 
 

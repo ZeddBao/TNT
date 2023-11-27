@@ -8,7 +8,7 @@
 
 # for multi-gpu training
 # nproc_per_node: set the number of gpu
-#python -m torch.distributed.launch --nproc_per_node=2 train_vectornet.py -d dataset/interm_data -o run/tnt/ -a -b 256 -c -m --lr 0.0010 -luf 10 -ldr 0.5
+/home/jiajie/anaconda3/envs/TNT/bin/python -m torch.distributed.launch --nproc_per_node=8 train_vectornet.py -d dataset/interm_data -o run/tnt/ -a -b 256 -c -m --lr 0.0010 -luf 10 -ldr 0.5
 
 # when you need to choose the training gpus, use this one
-CUDA_VISIBLE_DEVICES=1,0 python -m torch.distributed.launch --nproc_per_node=2 train_vectornet.py -d dataset/interm_data -o run/vectornet/ -a -b 256 -c -m --lr 0.0010 -luf 10 -ldr 0.5
+# CUDA_VISIBLE_DEVICES=5,4,3,2,1,0 /home/jiajie/anaconda3/envs/TNT/bin/python -m torch.distributed.launch --nproc_per_node=6 train_vectornet.py -d dataset/interm_data -o run/vectornet/ -a -b 256 -c -m --lr 0.0010 -luf 10 -ldr 0.5
